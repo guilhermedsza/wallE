@@ -161,8 +161,8 @@ void loop() {
   delay(1000);
   runNeckTopTest();
   delay(1000);
-  runArmsTest();
-  delay(1000);
+  // runArmsTest();
+  // delay(1000);
 }
 
 
