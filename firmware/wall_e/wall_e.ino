@@ -162,7 +162,7 @@ void loop() {
   runNeckTopTest();
   delay(1000);
   runArmsTest();
-  // delay(1000);
+  delay(1000);
 }
 
 
