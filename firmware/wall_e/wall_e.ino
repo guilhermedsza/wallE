@@ -1,12 +1,22 @@
 #include <ESP32Servo.h>
+#include <Wire.h> // Wire is for I2C
+#include <Adafruit_PWMServoDriver.h>
 
-Servo leftEye;
-Servo rightEye;
-Servo head;
-Servo neckTop;
-Servo neckBottom;
-Servo rightArm;
-Servo leftArm;
+Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
+// https://dronebotworkshop.com/esp32-servo/
+
+#define SERVOMIN 80
+#define SERVOMAX 600
+
+#define LEFTEYE 0
+#define RIGHTEYE 1
+#define HEAD 2
+#define NECKTOP 3
+#define NECKBOTTOM 4
+#define LEFTARM 5
+#define RIGHTARM 6
+
+int pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, pwm6;
 
 void runArmsTest() {
   int rightArmHigh = 110;
@@ -15,20 +25,38 @@ void runArmsTest() {
   int leftArmLow = 180 - rightArmLow;
   int leftArmHigh = 180 - rightArmHigh;
 
-  leftArm.write(leftArmHigh);
-  rightArm.write(rightArmHigh);
+  setServoPosition(&pwm5, LEFTARM, leftArmHigh);
+  setServoPosition(&pwm6, RIGHTARM, rightArmHigh);
   delay(500);
 
-  leftArm.write(leftArmLow);
-  rightArm.write(rightArmLow);
+  setServoPosition(&pwm5, LEFTARM, leftArmLow);
+  setServoPosition(&pwm6, RIGHTARM, rightArmLow);
   delay(500);
   
-  leftArm.write(leftArmHigh);
-  rightArm.write(rightArmHigh);
+  setServoPosition(&pwm5, LEFTARM, leftArmHigh);
+  setServoPosition(&pwm6, RIGHTARM, rightArmHigh);
   delay(500);
 
-  leftArm.write(leftArmLow);
-  rightArm.write(rightArmLow);
+  setServoPosition(&pwm5, LEFTARM, leftArmLow);
+  setServoPosition(&pwm6, RIGHTARM, rightArmLow);
+  delay(500);
+}
+
+
+void runNeckTopTest() {
+  int neckTopHigh = 180;
+  int neckTopLow = 10;
+
+  setServoPosition(&pwm3, NECKTOP, neckTopHigh);
+  delay(500);
+
+  setServoPosition(&pwm3, NECKTOP, neckTopLow);
+  delay(500);
+
+  setServoPosition(&pwm3, NECKTOP, neckTopHigh);
+  delay(500);
+
+  setServoPosition(&pwm3, NECKTOP, neckTopLow);
   delay(500);
 }
 
@@ -37,27 +65,16 @@ void runNeckBottomTest() {
   int neckBottomLow = 90;
   // 50
 
-  neckBottom.write(neckBottomHigh);
+  setServoPosition(&pwm4, NECKBOTTOM, neckBottomHigh);
   delay(500);
 
-  neckBottom.write(neckBottomLow);
-  delay(500);
-}
-
-void runNeckTopTest() {
-  int neckTopHigh = 180;
-  int neckTopLow = 10;
-
-  neckTop.write(neckTopHigh);
+  setServoPosition(&pwm4, NECKBOTTOM, neckBottomLow);
   delay(500);
 
-  neckTop.write(neckTopLow);
+  setServoPosition(&pwm4, NECKBOTTOM, neckBottomHigh);
   delay(500);
 
-  neckTop.write(neckTopHigh);
-  delay(500);
-
-  neckTop.write(neckTopLow);
+  setServoPosition(&pwm4, NECKBOTTOM, neckBottomLow);
   delay(500);
 }
 
@@ -66,98 +83,91 @@ void runHeadTest() {
   int headHigh = 180;
   int headLow = 10;
 
-  head.write(headHigh);
+  setServoPosition(&pwm2, HEAD, headHigh);
   delay(500);
   
-  head.write(headLow);
+  setServoPosition(&pwm2, HEAD, headLow);
   delay(500);
 
-  head.write(headHigh);
+  setServoPosition(&pwm2, HEAD, headHigh);
   delay(500);
 
-  head.write(headLow);
+  setServoPosition(&pwm2, HEAD, headLow);
   delay(500);
 
-  head.write(headHigh);
+  setServoPosition(&pwm2, HEAD, headHigh);
   delay(500);
 
-  head.write(headLow);
+  setServoPosition(&pwm2, HEAD, headLow);
   delay(500);
 
-  head.write(95);
+  setServoPosition(&pwm2, HEAD, 95);
   delay(500);
 }
 
 void runEyesTest() {
-  // left eye: 140, 100
   int rightEyeHigh = 40;
   int rightEyeLow = 80;
 
   int leftEyeHigh = 180-rightEyeHigh;
   int leftEyeLow = 180-rightEyeLow;
 
-  leftEye.write(leftEyeLow);  
-  rightEye.write(rightEyeLow);
+  setServoPosition(&pwm0, LEFTEYE, leftEyeLow);
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeLow);
   delay(500);
 
-  leftEye.write(leftEyeHigh);  
-  rightEye.write(rightEyeHigh);  
+  setServoPosition(&pwm0, LEFTEYE, leftEyeHigh);
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeHigh);
   delay(500);
 
-  leftEye.write(leftEyeLow);  
-  rightEye.write(rightEyeHigh);
+  setServoPosition(&pwm0, LEFTEYE, leftEyeLow); 
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeHigh);
   delay(500);
 
-  leftEye.write(leftEyeHigh);  
-  rightEye.write(rightEyeLow);  
+  setServoPosition(&pwm0, LEFTEYE, leftEyeHigh); 
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeHigh);
   delay(500);
 
-   leftEye.write(leftEyeLow);  
-  rightEye.write(rightEyeHigh);
+  setServoPosition(&pwm0, LEFTEYE, leftEyeLow); 
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeHigh);
   delay(500);
 
-   leftEye.write(leftEyeHigh);  
-  rightEye.write(rightEyeLow);   
+  setServoPosition(&pwm0, LEFTEYE, leftEyeHigh);
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeLow);  
   delay(500);
 
-  leftEye.write(leftEyeHigh);  
-  rightEye.write(rightEyeHigh);  
+  setServoPosition(&pwm1, RIGHTEYE, rightEyeHigh);  
   delay(500);
 }
 
-void setup() {
-  ESP32PWM::allocateTimer(0);
-  ESP32PWM::allocateTimer(1);
-  ESP32PWM::allocateTimer(2);
-  ESP32PWM::allocateTimer(3);
-  ESP32PWM::allocateTimer(4);
-  ESP32PWM::allocateTimer(5);
-  ESP32PWM::allocateTimer(6);
+void setServoPosition(int* pwm, int servoChannel, int angle) {
+  *pwm = map(angle, 0, 180, SERVOMIN, SERVOMAX);
+  pca9685.setPWM(servoChannel, 0 , *pwm); 
+}
 
-  leftEye.setPeriodHertz(50);    // Standard 50 hz servo
-  leftEye.attach(12, 500, 2500); // pin, min, max in microseconds
-
-  rightEye.setPeriodHertz(50);   
-  rightEye.attach(13, 500, 2500); 
-
-  head.setPeriodHertz(50);   
-  head.attach(12, 500, 2500);
-
-  neckTop.setPeriodHertz(50);
-  neckTop.attach(12, 500, 2500);
-
-  neckBottom.setPeriodHertz(50);   
-  neckBottom.attach(13, 500, 2500); 
-
-  leftArm.setPeriodHertz(50);   
-  leftArm.attach(12, 500, 2500);
-
-  rightArm.setPeriodHertz(50);   
-  rightArm.attach(13, 500, 2500);
-
-  runEyesTest();
+void setup () {
+  Serial.begin(115200);
+  Serial.println("PCA9685 Servo Test");
+  pca9685.begin();
+  pca9685.setPWMFreq(50);
 }
 
 void loop() {
-  // Nothing here — static position test
+  runEyesTest();
+  delay(1000);
+  runHeadTest();
+  delay(1000);
+  runNeckBottomTest();
+  delay(1000);
+  runNeckTopTest();
+  delay(1000);
+  runArmsTest();
+  delay(1000);
 }
+
+
+
+
+
+
+
