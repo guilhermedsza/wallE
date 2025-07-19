@@ -21,6 +21,9 @@ Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 
 int pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, pwm6;
 
+float yawAngle = 95.0;
+float yawSpeed = 90.0; //degrees/sec
+
 //Servo functions
 
 void runArmsTest() {
@@ -152,7 +155,30 @@ void setServoPosition(int* pwm, int servoChannel, int angle) {
 
 //Dualshock 5 functions
 
-unsigned long lastTimeStamp = 0;
+float stickDeadzone = 0.1;
+
+unsigned long lastLogTimeStamp = 0;
+unsigned long lastControllerUpdate = 0;
+
+void rightStickController() {
+  unsigned long now = millis();
+  float deltaTime = (now - lastControllerUpdate) / 1000.0; //.0 to make sure this is a floating-point division instead of an integer division
+  lastControllerUpdate = now;
+
+  //Right stick axes
+  float rx = ps5.RStickX()/128.0;
+
+  if(abs(rx) < stickDeadzone) rx = 0.0;
+
+  yawAngle += rx*yawSpeed*deltaTime;
+
+  if(yawAngle < 0) yawAngle = 0;
+  if(yawAngle > 180) yawAngle = 180;
+
+  Serial.printf("Yaw Angle: %.2f\n", yawAngle);
+
+  setServoPosition(&pwm2, HEAD, yawAngle);
+}
 
 void notify() {
   char messageString[200];
@@ -183,10 +209,10 @@ void notify() {
   ps5.Battery());
 
   //Only needed to print the message properly on serial monitor. Else we dont need it.
-  if (millis() - lastTimeStamp > 50)
+  if (millis() - lastLogTimeStamp > 50)
   {
     Serial.println(messageString);
-    lastTimeStamp = millis();
+    lastLogTimeStamp = millis();
   }
 }
 
@@ -205,18 +231,28 @@ void setup () {
   pca9685.setPWMFreq(50);
 
   //ps5 settings
-  ps5.attach(notify);
+  // ps5.attach(notify);
   ps5.attachOnConnect(onConnect);
   ps5.attachOnDisconnect(onDisconnect);
   ps5.begin("4C:B9:9B:AD:03:BF");
   while(ps5.isConnected() == false) {
     Serial.println("Dualshock 5 not found");
-    delay(300);
+    delay(3000);
   }
   Serial.println("Dualshock 5 ready");
+
+  lastControllerUpdate = millis();
 }
 
 void loop() {
+  if(!ps5.isConnected()) return;
+
+  if(ps5.Triangle()){
+    runEyesTest();
+  }
+
+  rightStickController();
+  
   // runEyesTest();
   // delay(1000);
   // runHeadTest();
