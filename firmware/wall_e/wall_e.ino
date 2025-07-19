@@ -1,6 +1,9 @@
 #include <ESP32Servo.h>
+
 #include <Wire.h> // Wire is for I2C
 #include <Adafruit_PWMServoDriver.h>
+#include <ps5Controller.h>
+
 
 Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 // https://dronebotworkshop.com/esp32-servo/
@@ -17,6 +20,8 @@ Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 #define RIGHTARM 6
 
 int pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, pwm6;
+
+//Servo functions
 
 void runArmsTest() {
   int rightArmHigh = 110;
@@ -145,23 +150,82 @@ void setServoPosition(int* pwm, int servoChannel, int angle) {
   pca9685.setPWM(servoChannel, 0 , *pwm); 
 }
 
+//Dualshock 5 functions
+
+unsigned long lastTimeStamp = 0;
+
+void notify() {
+  char messageString[200];
+  sprintf(messageString, "%4d,%4d,%4d,%4d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d",
+  ps5.LStickX(),
+  ps5.LStickY(),
+  ps5.RStickX(),
+  ps5.RStickY(),
+  ps5.Left(),
+  ps5.Down(),
+  ps5.Right(),
+  ps5.Up(),
+  ps5.Square(),
+  ps5.Cross(),
+  ps5.Circle(),
+  ps5.Triangle(),
+  ps5.L1(),
+  ps5.R1(),
+  ps5.L2(),
+  ps5.R2(),  
+  ps5.Share(),
+  ps5.Options(),
+  ps5.PSButton(),
+  ps5.Touchpad(),
+  ps5.Charging(),
+  ps5.Audio(),
+  ps5.Mic(),
+  ps5.Battery());
+
+  //Only needed to print the message properly on serial monitor. Else we dont need it.
+  if (millis() - lastTimeStamp > 50)
+  {
+    Serial.println(messageString);
+    lastTimeStamp = millis();
+  }
+}
+
+void onConnect() {
+  Serial.println("Connected!.");
+}
+
+void onDisconnect() {
+  Serial.println("Disconnected!.");    
+}
+
 void setup () {
   Serial.begin(115200);
   Serial.println("PCA9685 Servo Test");
   pca9685.begin();
   pca9685.setPWMFreq(50);
+
+  //ps5 settings
+  ps5.attach(notify);
+  ps5.attachOnConnect(onConnect);
+  ps5.attachOnDisconnect(onDisconnect);
+  ps5.begin("4C:B9:9B:AD:03:BF");
+  while(ps5.isConnected() == false) {
+    Serial.println("Dualshock 5 not found");
+    delay(300);
+  }
+  Serial.println("Dualshock 5 ready");
 }
 
 void loop() {
-  runEyesTest();
-  delay(1000);
-  runHeadTest();
-  delay(1000);
-  runNeckBottomTest();
-  delay(1000);
-  runNeckTopTest();
-  delay(1000);
-  runArmsTest();
+  // runEyesTest();
+  // delay(1000);
+  // runHeadTest();
+  // delay(1000);
+  // runNeckBottomTest();
+  // delay(1000);
+  // runNeckTopTest();
+  // delay(1000);
+  // runArmsTest();
   // delay(1000);
 }
 
