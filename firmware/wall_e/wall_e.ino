@@ -3,7 +3,12 @@
 #include <Wire.h> // Wire is for I2C
 #include <Adafruit_PWMServoDriver.h>
 #include <ps5Controller.h>
+#include <WiFi.h>
+#include <ArduinoOTA.h>
+#include <RemoteDebug.h>
+#include "../config/secrets.h"
 
+RemoteDebug Debug;
 
 Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 // https://dronebotworkshop.com/esp32-servo/
@@ -210,83 +215,113 @@ void ryController(float deltaTime) {
   pitchBottom = constrain(pitchBottom, 90, 180);
   pitchTop    = constrain(pitchTop, 10, 180);
 
-  Serial.printf("Pitch Angle: %.2f\n", pitchAngle);
-  Serial.printf("Pitch Top: %.2f\n", pitchTop);
-  Serial.printf("Pitch Bottom: %.2f\n", pitchBottom);
-
   setServoPosition(&pwm3, NECKTOP, pitchTop);
   setServoPosition(&pwm4, NECKBOTTOM, pitchBottom);
 }
 
-void notify() {
-  char messageString[200];
-  sprintf(messageString, "%4d,%4d,%4d,%4d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d",
-  ps5.LStickX(),
-  ps5.LStickY(),
-  ps5.RStickX(),
-  ps5.RStickY(),
-  ps5.Left(),
-  ps5.Down(),
-  ps5.Right(),
-  ps5.Up(),
-  ps5.Square(),
-  ps5.Cross(),
-  ps5.Circle(),
-  ps5.Triangle(),
-  ps5.L1(),
-  ps5.R1(),
-  ps5.L2(),
-  ps5.R2(),  
-  ps5.Share(),
-  ps5.Options(),
-  ps5.PSButton(),
-  ps5.Touchpad(),
-  ps5.Charging(),
-  ps5.Audio(),
-  ps5.Mic(),
-  ps5.Battery());
+// void notify() {
+//   char messageString[200];
+//   sprintf(messageString, "%4d,%4d,%4d,%4d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d",
+//   ps5.LStickX(),
+//   ps5.LStickY(),
+//   ps5.RStickX(),
+//   ps5.RStickY(),
+//   ps5.Left(),
+//   ps5.Down(),
+//   ps5.Right(),
+//   ps5.Up(),
+//   ps5.Square(),
+//   ps5.Cross(),
+//   ps5.Circle(),
+//   ps5.Triangle(),
+//   ps5.L1(),
+//   ps5.R1(),
+//   ps5.L2(),
+//   ps5.R2(),  
+//   ps5.Share(),
+//   ps5.Options(),
+//   ps5.PSButton(),
+//   ps5.Touchpad(),
+//   ps5.Charging(),
+//   ps5.Audio(),
+//   ps5.Mic(),
+//   ps5.Battery());
 
-  //Only needed to print the message properly on serial monitor. Else we dont need it.
-  if (millis() - lastLogTimeStamp > 50)
-  {
-    Serial.println(messageString);
-    lastLogTimeStamp = millis();
-  }
-}
+//   //Only needed to print the message properly on serial monitor. Else we dont need it.
+//   if (millis() - lastLogTimeStamp > 50)
+//   {
+//     log(messageString);
+//     lastLogTimeStamp = millis();
+//   }
+// }
 
 void onConnect() {
-  Serial.println("Connected!.");
+  log("Connected!.");
 }
 
 void onDisconnect() {
-  Serial.println("Disconnected!.");    
+  log("Disconnected!.");    
+}
+
+void log(String text) {
+  Serial.println(text);
+  Debug.println(text);
 }
 
 void setup () {
   Serial.begin(115200);
-  Serial.println("PCA9685 Servo Test");
+  //Wifi setup
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while(WiFi.status() != WL_CONNECTED){
+    delay(500);
+    log(".");
+  }
+  log("WiFi connected");
+
+  //OTA setup
+  ArduinoOTA.setHostname("wall-e"); 
+  ArduinoOTA.setPassword(nullptr); //default password is OTAPASSWORD
+  ArduinoOTA.begin();
+
+  //RemoteDebug setup
+  Debug.begin("wall-e");  
+  Debug.setResetCmdEnabled(true);
+  Debug.showProfiler(true);
+  Debug.showColors(true);
+
+  log("Setup complete, OTA + RemoteDebug ready");
+
+  //PCA setup
   pca9685.begin();
   pca9685.setPWMFreq(50);
 
-  //ps5 settings
+  //ps5 setup
   // ps5.attach(notify);
   ps5.attachOnConnect(onConnect);
   ps5.attachOnDisconnect(onDisconnect);
   ps5.begin("4C:B9:9B:AD:03:BF");
   while(ps5.isConnected() == false) {
-    Serial.println("Dualshock 5 not found");
+    log("Dualshock 5 not found");
     delay(3000);
   }
-  Serial.println("Dualshock 5 ready");
+  log("Dualshock 5 ready");
 
   lastControllerUpdate = millis();
 }
 
 void loop() {
+  ArduinoOTA.handle();
+  Debug.handle();
+
   if(!ps5.isConnected()) return;
 
   if(ps5.Triangle()){
     runEyesTest();
+  }
+
+  if(ps5.Square()){
+    log(String("Wifi ssid: ") + WIFI_SSID);
+    log(String("Wifi pass: ") + WIFI_PASS);
   }
 
   rightStickController();
