@@ -22,7 +22,10 @@ Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 int pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, pwm6;
 
 float yawAngle = 95.0;
-float yawSpeed = 90.0; //degrees/sec
+float yawSpeed = 180.0; //degrees/sec
+
+float pitchSpeed = 180.0;
+float pitchAngle = 90.0;
 
 //Servo functions
 
@@ -165,19 +168,54 @@ void rightStickController() {
   float deltaTime = (now - lastControllerUpdate) / 1000.0; //.0 to make sure this is a floating-point division instead of an integer division
   lastControllerUpdate = now;
 
-  //Right stick axes
+  rxController(deltaTime);
+  ryController(deltaTime);
+}
+
+
+void rxController(float deltaTime) {
   float rx = ps5.RStickX()/128.0;
-
   if(abs(rx) < stickDeadzone) rx = 0.0;
-
   yawAngle += rx*yawSpeed*deltaTime;
-
-  if(yawAngle < 0) yawAngle = 0;
-  if(yawAngle > 180) yawAngle = 180;
-
-  Serial.printf("Yaw Angle: %.2f\n", yawAngle);
-
+  yawAngle = constrain(yawAngle, 0, 180);
   setServoPosition(&pwm2, HEAD, yawAngle);
+}
+
+void ryController(float deltaTime) {
+  float ry = ps5.RStickY()/128.0;
+
+  if(abs(ry) < stickDeadzone) ry = 0.0;
+  pitchAngle += ry*pitchSpeed*deltaTime;
+  pitchAngle = constrain(pitchAngle, 0, 270); 
+
+  int pitchTop, pitchBottom;
+
+  if (pitchAngle <= 90) {
+    //Step 1: Top only moves
+    pitchBottom = 90;
+    pitchTop = map(pitchAngle, 0, 90, 180, 90);
+    
+  } else if (pitchAngle <= 180) {
+    //Step 2: Both move together
+    pitchBottom = map(pitchAngle, 90, 180, 90, 180);
+    pitchTop = map(pitchAngle, 90, 180, 90, 180);
+
+  } else {
+    //Step 3: Bottom stays at max, top decreases
+    pitchBottom = 180;
+    pitchTop = map(pitchAngle, 180, 270, 180, 10);
+  }
+
+  // Safety clamps just in case
+  pitchBottom = constrain(pitchBottom, 90, 180);
+  pitchTop    = constrain(pitchTop, 10, 180);
+
+  Serial.printf("Pitch Angle: %.2f\n", pitchAngle);
+  Serial.printf("Pitch Top: %.2f\n", pitchTop);
+  Serial.printf("Pitch Bottom: %.2f\n", pitchBottom);
+
+  setServoPosition(&pwm3, NECKTOP, pitchTop);
+  setServoPosition(&pwm4, NECKBOTTOM, pitchBottom);
 }
 
 void notify() {
