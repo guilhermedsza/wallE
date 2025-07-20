@@ -3,7 +3,12 @@
 #include <Wire.h> // Wire is for I2C
 #include <Adafruit_PWMServoDriver.h>
 #include <ps5Controller.h>
+#include <WiFi.h>
+#include <ArduinoOTA.h>
+#include <RemoteDebug.h>
+#include "../config/secrets.h"
 
+RemoteDebug Debug;
 
 Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 // https://dronebotworkshop.com/esp32-servo/
@@ -20,6 +25,12 @@ Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(0x40);
 #define RIGHTARM 6
 
 int pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, pwm6;
+
+float yawAngle = 95.0;
+float yawSpeed = 180.0; //degrees/sec
+
+float pitchSpeed = 180.0;
+float pitchAngle = 90.0;
 
 //Servo functions
 
@@ -152,71 +163,169 @@ void setServoPosition(int* pwm, int servoChannel, int angle) {
 
 //Dualshock 5 functions
 
-unsigned long lastTimeStamp = 0;
+float stickDeadzone = 0.1;
 
-void notify() {
-  char messageString[200];
-  sprintf(messageString, "%4d,%4d,%4d,%4d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d",
-  ps5.LStickX(),
-  ps5.LStickY(),
-  ps5.RStickX(),
-  ps5.RStickY(),
-  ps5.Left(),
-  ps5.Down(),
-  ps5.Right(),
-  ps5.Up(),
-  ps5.Square(),
-  ps5.Cross(),
-  ps5.Circle(),
-  ps5.Triangle(),
-  ps5.L1(),
-  ps5.R1(),
-  ps5.L2(),
-  ps5.R2(),  
-  ps5.Share(),
-  ps5.Options(),
-  ps5.PSButton(),
-  ps5.Touchpad(),
-  ps5.Charging(),
-  ps5.Audio(),
-  ps5.Mic(),
-  ps5.Battery());
+unsigned long lastLogTimeStamp = 0;
+unsigned long lastControllerUpdate = 0;
 
-  //Only needed to print the message properly on serial monitor. Else we dont need it.
-  if (millis() - lastTimeStamp > 50)
-  {
-    Serial.println(messageString);
-    lastTimeStamp = millis();
-  }
+void rightStickController() {
+  unsigned long now = millis();
+  float deltaTime = (now - lastControllerUpdate) / 1000.0; //.0 to make sure this is a floating-point division instead of an integer division
+  lastControllerUpdate = now;
+
+  rxController(deltaTime);
+  ryController(deltaTime);
 }
 
+
+void rxController(float deltaTime) {
+  float rx = ps5.RStickX()/128.0;
+  if(abs(rx) < stickDeadzone) rx = 0.0;
+  yawAngle += rx*yawSpeed*deltaTime;
+  yawAngle = constrain(yawAngle, 0, 180);
+  setServoPosition(&pwm2, HEAD, yawAngle);
+}
+
+void ryController(float deltaTime) {
+  float ry = ps5.RStickY()/128.0;
+
+  if(abs(ry) < stickDeadzone) ry = 0.0;
+  pitchAngle += ry*pitchSpeed*deltaTime;
+  pitchAngle = constrain(pitchAngle, 0, 270); 
+
+  int pitchTop, pitchBottom;
+
+  if (pitchAngle <= 90) {
+    //Step 1: Top only moves
+    pitchBottom = 90;
+    pitchTop = map(pitchAngle, 0, 90, 180, 90);
+    
+  } else if (pitchAngle <= 180) {
+    //Step 2: Both move together
+    pitchBottom = map(pitchAngle, 90, 180, 90, 180);
+    pitchTop = map(pitchAngle, 90, 180, 90, 180);
+
+  } else {
+    //Step 3: Bottom stays at max, top decreases
+    pitchBottom = 180;
+    pitchTop = map(pitchAngle, 180, 270, 180, 10);
+  }
+
+  // Safety clamps just in case
+  pitchBottom = constrain(pitchBottom, 90, 180);
+  pitchTop    = constrain(pitchTop, 10, 180);
+
+  setServoPosition(&pwm3, NECKTOP, pitchTop);
+  setServoPosition(&pwm4, NECKBOTTOM, pitchBottom);
+}
+
+// void notify() {
+//   char messageString[200];
+//   sprintf(messageString, "%4d,%4d,%4d,%4d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d",
+//   ps5.LStickX(),
+//   ps5.LStickY(),
+//   ps5.RStickX(),
+//   ps5.RStickY(),
+//   ps5.Left(),
+//   ps5.Down(),
+//   ps5.Right(),
+//   ps5.Up(),
+//   ps5.Square(),
+//   ps5.Cross(),
+//   ps5.Circle(),
+//   ps5.Triangle(),
+//   ps5.L1(),
+//   ps5.R1(),
+//   ps5.L2(),
+//   ps5.R2(),  
+//   ps5.Share(),
+//   ps5.Options(),
+//   ps5.PSButton(),
+//   ps5.Touchpad(),
+//   ps5.Charging(),
+//   ps5.Audio(),
+//   ps5.Mic(),
+//   ps5.Battery());
+
+//   //Only needed to print the message properly on serial monitor. Else we dont need it.
+//   if (millis() - lastLogTimeStamp > 50)
+//   {
+//     log(messageString);
+//     lastLogTimeStamp = millis();
+//   }
+// }
+
 void onConnect() {
-  Serial.println("Connected!.");
+  log("Connected!.");
 }
 
 void onDisconnect() {
-  Serial.println("Disconnected!.");    
+  log("Disconnected!.");    
+}
+
+void log(String text) {
+  Serial.println(text);
+  Debug.println(text);
 }
 
 void setup () {
   Serial.begin(115200);
-  Serial.println("PCA9685 Servo Test");
+  //Wifi setup
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while(WiFi.status() != WL_CONNECTED){
+    delay(500);
+    log(".");
+  }
+  log("WiFi connected");
+
+  //OTA setup
+  ArduinoOTA.setHostname("wall-e"); 
+  ArduinoOTA.setPassword(nullptr); //default password is OTAPASSWORD
+  ArduinoOTA.begin();
+
+  //RemoteDebug setup
+  Debug.begin("wall-e");  
+  Debug.setResetCmdEnabled(true);
+  Debug.showProfiler(true);
+  Debug.showColors(true);
+
+  log("Setup complete, OTA + RemoteDebug ready");
+
+  //PCA setup
   pca9685.begin();
   pca9685.setPWMFreq(50);
 
-  //ps5 settings
-  ps5.attach(notify);
+  //ps5 setup
+  // ps5.attach(notify);
   ps5.attachOnConnect(onConnect);
   ps5.attachOnDisconnect(onDisconnect);
   ps5.begin("4C:B9:9B:AD:03:BF");
   while(ps5.isConnected() == false) {
-    Serial.println("Dualshock 5 not found");
-    delay(300);
+    log("Dualshock 5 not found");
+    delay(3000);
   }
-  Serial.println("Dualshock 5 ready");
+  log("Dualshock 5 ready");
+
+  lastControllerUpdate = millis();
 }
 
 void loop() {
+  ArduinoOTA.handle();
+  Debug.handle();
+
+  if(!ps5.isConnected()) return;
+
+  if(ps5.Triangle()){
+    runEyesTest();
+  }
+
+  if(ps5.Square()){
+    log(String("Wifi ssid: ") + WIFI_SSID);
+    log(String("Wifi pass: ") + WIFI_PASS);
+  }
+
+  rightStickController();
+  
   // runEyesTest();
   // delay(1000);
   // runHeadTest();
