@@ -1,4 +1,4 @@
-import vision.face_recognition
+import vision.facerecognition
 import time
 
 def main():
@@ -7,7 +7,7 @@ def main():
     try:
         while True:
             print("AI running")
-            vision.face_recognition.main()
+            vision.facerecognition.FaceRecognition()
 
             time.sleep(10)
     except KeyboardInterrupt:
