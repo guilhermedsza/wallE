@@ -7,7 +7,8 @@ def main():
     try:
         while True:
             print("AI running")
-            vision.facerecognition.FaceRecognition()
+            fr = vision.facerecognition.FaceRecognition()
+            fr.run_recognition()
 
             time.sleep(10)
     except KeyboardInterrupt:

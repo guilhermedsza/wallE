@@ -25,11 +25,14 @@ class FaceRecognition:
     process_current_frame = True
 
     def __init__(self):
+        self.base_path = os.path.dirname(os.path.abspath(__file__))  # directory where facerecognition.py is located
+        self.faces_path = os.path.join(self.base_path, 'faces')
         self.encode_faces()
 
     def encode_faces(self):
-        for image in os.listdir('faces'):
-            face_image = face_recognition.load_image_file(f'faces/{image}')
+        for image in os.listdir(self.faces_path):
+            image_path = os.path.join(self.faces_path, image)
+            face_image = face_recognition.load_image_file(image_path)
             face_encoding = face_recognition.face_encodings(face_image)[0]
 
             self.known_face_encodings.append(face_encoding)
@@ -38,75 +41,74 @@ class FaceRecognition:
         print(self.known_face_names)
 
     def run_recognition(self):
-        # video_capture = cv2.VideoCapture(0) #0 is which camera will be used. I have two connected and want the first one to be used. Needs to allow camera permission for vscode
-        video_capture = cv2.VideoCapture(0, cv2.CAP_V4L2)
-        video_capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
-        video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        video_capture.set(cv2.CAP_PROP_FPS, 30)
+        if hasattr(self, 'video_capture') and self.video_capture.isOpened():
+            self.video_capture.release()
+        # video_capture = cv2.VideoCapture(0) 
+        video_capture = cv2.VideoCapture(0, cv2.CAP_V4L2) #0 is which camera will be used. I have two connected and want the first one to be used. Needs to allow camera permission for vscode
+        # video_capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
+        # video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        # video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # video_capture.set(cv2.CAP_PROP_FPS, 30)
 
         if not video_capture.isOpened():
             sys.exit('Video source not found...')
         
-        while True: 
-            ret, frame = video_capture.read()
+        try: 
+            while True: 
+                ret, frame = video_capture.read()
 
-            print("Frame status:", ret, "Frame type:", type(frame))
-            if frame is not None:
-                print("Frame shape:", frame.shape)
+                if not ret or frame is None:
+                    print("⚠️ Warning: Failed to grab frame from camera")
+                    continue
 
-            if not ret or frame is None:
-                print("⚠️ No frame captured from camera")
-                continue
+                #we only want to process every second frame, thus:
+                if self.process_current_frame:
+                    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25) #resizing frame to 1/4 of current to save computer resources
+                    rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB) #face recognition uses different type of color formatting than openCV (which uses rgb). This line changes face recognition to rgb as well
 
-            #we only want to process every second frame, thus:
-            if self.process_current_frame:
-                small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25) #resizing frame to 1/4 of current to save computer resources
-                rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB) #face recognition uses different type of color formatting than openCV (which uses rgb). This line changes face recognition to rgb as well
+                    #Find all faces in current frame:
+                    # print("Detected face locations:", self.face_locations)
+                    self.face_locations = face_recognition.face_locations(rgb_small_frame)
+                    self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
 
-                #Find all faces in current frame:
-                print("Detected face locations:", self.face_locations)
-                self.face_locations = face_recognition.face_locations(rgb_small_frame)
-                self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
+                    self.face_names = []
+                    for face_encoding in self.face_encodings:
+                            matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+                            name = 'Unknown'
+                            confidence = ' Unknown'
 
-                self.face_names = []
-                for face_encoding in self.face_encodings:
-                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
-                        name = 'Unknown'
-                        confidence = ' Unknown'
+                            face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                            best_match_index = np.argmin(face_distances)
 
-                        face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
-                        best_match_index = np.argmin(face_distances)
-
-                        if matches[best_match_index]:
-                            name = self.known_face_names[best_match_index]
-                            confidence = face_confidence(face_distances[best_match_index])
-                        
-                        self.face_names.append(f'{name} ({confidence})')
+                            if matches[best_match_index]:
+                                name = self.known_face_names[best_match_index]
+                                confidence = face_confidence(face_distances[best_match_index])
+                            
+                            self.face_names.append(f'{name} ({confidence})')
 
 
-            self.process_current_frame = not self.process_current_frame
+                self.process_current_frame = not self.process_current_frame
 
-            #Display annotations
-            for(top, right, bottom, left), name in zip(self.face_locations, self.face_names):
-                #bring image to original dimensions (as opposed to 1/4th of the size):
-                top *= 4
-                right *= 4
-                bottom *= 4
-                left *= 4
+                #Display annotations
+                for(top, right, bottom, left), name in zip(self.face_locations, self.face_names):
+                    #bring image to original dimensions (as opposed to 1/4th of the size):
+                    top *= 4
+                    right *= 4
+                    bottom *= 4
+                    left *= 4
 
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2) #red color and thickness of 2
-                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), -1) #-1 fills the square instead of giving it a thickness
-                cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1) #creates text (name) in left+6, bottom-6 coordinates, HERSHEY font, 0.8 size, white with a thickness of 1
+                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2) #red color and thickness of 2
+                    cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), -1) #-1 fills the square instead of giving it a thickness
+                    cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1) #creates text (name) in left+6, bottom-6 coordinates, HERSHEY font, 0.8 size, white with a thickness of 1
 
-            cv2.imshow('Face Recognition', frame)
-            
-            #if q is pressed for 1 milisec, breaks
-            if cv2.waitKey(1) == ord('q'):
-                break
-
-        video_capture.release()
-        cv2.destroyAllWindows()
+                cv2.imshow('Face Recognition', frame)
+                
+                #if q is pressed for 1 milisec, breaks
+                if cv2.waitKey(1) == ord('q'):
+                    break
+        finally:
+            video_capture.release()
+            cv2.destroyAllWindows()
 
 
 
