@@ -1,1 +1,6 @@
+#firmware
 /firmware/config/secrets.h
+
+#ai
+venv/
+/ai/vision/faces
