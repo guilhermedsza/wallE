@@ -43,12 +43,8 @@ class FaceRecognition:
     def run_recognition(self):
         if hasattr(self, 'video_capture') and self.video_capture.isOpened():
             self.video_capture.release()
-        # video_capture = cv2.VideoCapture(0) 
-        video_capture = cv2.VideoCapture(0, cv2.CAP_V4L2) #0 is which camera will be used. I have two connected and want the first one to be used. Needs to allow camera permission for vscode
-        # video_capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
-        # video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        # video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        # video_capture.set(cv2.CAP_PROP_FPS, 30)
+            
+        video_capture = cv2.VideoCapture(2, cv2.CAP_V4L2) #0 is which camera will be used. I have two connected and want the first one to be used. Needs to allow camera permission for vscode
 
         if not video_capture.isOpened():
             sys.exit('Video source not found...')
