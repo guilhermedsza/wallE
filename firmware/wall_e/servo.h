@@ -16,3 +16,5 @@ enum ServoChannel : uint8_t {
 void servoSetup(Adafruit_PWMServoDriver& driver);
 
 void setServoDeg(ServoChannel ch, uint16_t degrees);
+
+void servoWave();

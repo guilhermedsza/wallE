@@ -1,6 +1,7 @@
 #include "servo.h"
 #include <Arduino.h> // constrain(), map()
 #include "../config/pins.h"
+#include "logger.h"
 // #include <Wire.h> // Wire is for I2C
 
 namespace {
@@ -24,3 +25,7 @@ void setServoDeg(ServoChannel ch, uint16_t deg)
   drv->setPWM(ch, 0, pulse[ch]);
 }
 
+void servoWave()
+{
+  LOG("SERVO WAVING");
+}

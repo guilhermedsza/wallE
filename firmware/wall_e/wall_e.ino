@@ -2,6 +2,7 @@
 #include "wifi.h"
 #include "servo.h"
 #include "logger.h"
+#include "websocket.h"
 #include "controller.h"
 
 #include "../config/pins.h"
@@ -21,7 +22,9 @@ void setup () {
 
   controllerSetup(PS5_MAC);
 
-  LOG("Setup complete, OTA + RemoteDebug ready");
+  websocketSetup();
+
+  LOG("Setup complete");
 }
 
 void loop() {
