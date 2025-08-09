@@ -6,6 +6,6 @@
   void controllerSetup(const char* mac); // call from setup()
   void controllerLoop(); // call each loop()
 #else
-  inline void controllerSetup() {}
+  inline void controllerSetup(const char* mac) {}
   inline void controllerLoop()  {}
 #endif

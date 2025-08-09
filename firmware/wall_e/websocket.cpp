@@ -16,15 +16,16 @@ static void onWsEvent (AsyncWebSocket *server, AsyncWebSocketClient *client, Aws
   if(info->opcode != WS_TEXT) return; //this line ignores binary frames
 
   String msg(reinterpret_cast<char *>(data), len);
-  LOGf("WS -> %s", msg.c_str());
+  msg.trim();   // <-- strips leading/trailing spaces, \r, \n, tabs, etc.
+  LOGf("WS ⇢ '%s' (len=%d)", msg.c_str(), msg.length());
 
-  if(msg.c_str() == "WAVE") {
+  if(msg == "WAVE") {
     LOG("IS WAVING");
     servoWave();
     websocketSend("DONE");
   }
 
-  if(msg.c_str() == "EYES") {
+  if(msg == "EYES") {
     LOG("WILL RUN EYES TEST");
     runEyesTest();
     websocketSend("DONE");
