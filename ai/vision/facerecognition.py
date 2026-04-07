@@ -3,6 +3,7 @@ import os, sys
 import cv2
 import numpy as np
 import math
+import websocket
 
 
 def face_confidence(face_distance, face_match_threshold=0.6):
@@ -26,10 +27,18 @@ class FaceRecognition:
     known_face_names = []
     process_current_frame = True
 
+    previously_seen_names = set()
+
+    ws = websocket.WebSocket()
+    ws.connect("ws://192.168.1.197/ws")
+
     def __init__(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.faces_path = os.path.join(self.base_path, "faces")
         self.encode_faces()
+
+    def recognized_person(self):
+        self.ws.send("EYES")
 
     def encode_faces(self):
         self.known_face_encodings = []
@@ -86,6 +95,8 @@ class FaceRecognition:
 
                     self.face_names = []
 
+                    current_seen_names = set()
+
                     for face_encoding in self.face_encodings:
                         name = "Unknown"
                         confidence = "Unknown"
@@ -104,8 +115,15 @@ class FaceRecognition:
                                 confidence = face_confidence(
                                     face_distances[best_match_index]
                                 )
+                                current_seen_names.add(name)
 
                         self.face_names.append(f"{name} ({confidence})")
+                new_names = current_seen_names - self.previously_seen_names
+
+                for name in new_names:
+                    self.recognized_person()
+
+                self.previously_seen_names = current_seen_names
 
                 self.process_current_frame = not self.process_current_frame
 
